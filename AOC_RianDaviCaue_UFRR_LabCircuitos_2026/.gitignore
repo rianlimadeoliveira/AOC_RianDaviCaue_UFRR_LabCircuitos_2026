@@ -1,0 +1,23 @@
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores / temporários
+*~
+*.swp
+*.bak
+.vscode/
+.idea/
+
+# Backups e temporários do Logisim / Office
+*.circ.bak
+*.circ~
+~$*
+.~lock.*#
+
+# Arquivos auxiliares de LaTeX (caso o relatório seja escrito em LaTeX)
+*.aux
+*.log
+*.out
+*.toc
