@@ -1087,12 +1087,18 @@
     </comp>
     <comp lib="1" loc="(1300,460)" name="AND Gate">
       <a name="inputs" val="3"/>
+      <a name="label" val="cincosete"/>
+      <a name="labelfont" val="SansSerif italic 10"/>
     </comp>
     <comp lib="1" loc="(1300,550)" name="AND Gate">
       <a name="inputs" val="3"/>
+      <a name="label" val="onze"/>
+      <a name="labelfont" val="SansSerif italic 10"/>
     </comp>
     <comp lib="1" loc="(1300,640)" name="AND Gate">
       <a name="inputs" val="3"/>
+      <a name="label" val="treze"/>
+      <a name="labelfont" val="SansSerif italic 10"/>
     </comp>
     <comp lib="1" loc="(1460,510)" name="OR Gate">
       <a name="inputs" val="4"/>
