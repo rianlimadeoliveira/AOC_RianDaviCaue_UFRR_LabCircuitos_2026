@@ -296,9 +296,180 @@ Essa escolha só é segura se a máquina, ao cair acidentalmente em um desses c�
 
 ### 3.3 Microprograma
 
+A segunda implementação gera os mesmos sinais de controle, mas guarda-os em uma memória em vez de calculá-los com portas. O sequenciamento fica a cargo de um microcontador de programa (µPC) de 3 bits, e os sinais ficam em uma ROM de 8 posições por 8 bits (Componente 05). O µPC (Componente 13) foi feito com um registrador de 3 flip-flops D (Componente 01) e um somador de +1, que juntos fazem o papel do contador síncrono. O estado atual (o valor do µPC) aparece em um display de sete segmentos (Componente 16). O circuito está em `parte2_microprogramada.circ`. Como na versão cabeada, o caminho de dados não foi montado: as saídas de controle são observadas em pinos de saída, e o opcode foi abstraído no pino `OP_BEQ` (equivalente ao `BEQ` da Seção 3.1), que vale 1 para beq e 0 para tipo-R.
+
+#### Formato da microinstrução
+
+A microinstrução tem 8 bits, divididos em quatro campos de 2 bits (Tabela 16). O campo Fonte com valor 00 implica, além de selecionar o PC e a constante 4 como entradas da ULA, a escrita incondicional do PC, por isso a microinstrução de busca não precisa de um campo próprio para o controle do PC.
+
+**Tabela 16 — Formato da microinstrução de 8 bits.**
+
+| Campo | Bits | Codificação |
+|---|---|---|
+| ULAOp | 7–6 | 00 = soma; 01 = subtração; 10 = operação dada pelo campo funct; 11 = reservado |
+| Fonte | 5–4 | 00 = PC e constante 4; 01 = registrador A e registrador B; 10 = PC e extensão de sinal deslocada de 2; 11 = reservado |
+| Ação | 3–2 | 00 = nenhuma; 01 = IR ← Mem[PC]; 10 = Reg[rd] ← ULAOut; 11 = PC ← ULAOut se Zero |
+| Seq | 1–0 | 00 = próxima microinstrução; 01 = volta à busca; 10 = despacho pelo opcode; 11 = reservado |
+
+#### Microprograma
+
+A Tabela 17 traz o microprograma completo. O conteúdo da ROM, carregado em `microcodigo.txt`, é `04 22 90 19 5d 00 00 00`; as posições 5, 6 e 7 ficam livres. Em ConclR, o campo ULAOp (00) é indiferente: Reg[rd] recebe o ULAOut já calculado em ExecR, e a saída da ULA não é usada nesse estado. Em ExecR, Fonte = 01 seleciona os registradores A e B, e ULAOp = 10 deixa a operação a cargo do campo funct.
+
+**Tabela 17 — Microprograma.**
+
+| Rótulo | Endereço | ULAOp | Fonte | Ação | Seq | Binário | Hexadecimal |
+|---|---|---|---|---|---|---|---|
+| Busca | 0 | 00 | 00 | 01 | 00 | 00000100 | 0x04 |
+| Decod | 1 | 00 | 10 | 00 | 10 | 00100010 | 0x22 |
+| ExecR | 2 | 10 | 01 | 00 | 00 | 10010000 | 0x90 |
+| ConclR | 3 | 00 | 01 | 10 | 01 | 00011001 | 0x19 |
+| ConclBEQ | 4 | 01 | 01 | 11 | 01 | 01011101 | 0x5D |
+
+Os códigos 101, 110 e 111 do µPC nunca são alcançados: o µPC só recebe µPC + 1 (dentro da faixa de 0 a 4), 0, 2 ou 4, e as posições 5 a 7 da ROM contêm 00.
+
+#### Circuito
+
+O µPC (registrador `upc`) endereça a ROM de microcódigo, e os oito bits lidos são divididos nos quatro campos. O campo Seq comanda o multiplexador de 4 entradas (Componente 02) que escolhe o próximo endereço, entregue ao registrador pelo rótulo `PROX`: com Seq = 00 o µPC recebe µPC + 1; com Seq = 01, recebe 0 (volta à busca); com Seq = 10 (despacho pelo opcode), recebe a saída de um segundo multiplexador, que escolhe entre o endereço 2 (tipo-R, `OP_BEQ` = 0) e o endereço 4 (beq, `OP_BEQ` = 1); Seq = 11 é reservado e leva a 0. O circuito está na Figura 20 e os pinos e elementos, na Tabela 18.
+
+**Figura 20 — Circuito principal da unidade microprogramada: µPC, somador, ROM de microcódigo, multiplexadores e display.**
+
+![Circuito principal da microprogramada](../parte2/evidencias/evidencias-microprogamada/evidencias/circuito_sequenciador_rom.png)
+
+**Tabela 18 — Elementos e pinos da versão microprogramada (`parte2_microprogramada.circ`).**
+
+| Elemento | Componente | Pinos e função |
+|---|---|---|
+| upc | Registrador de 3 flip-flops D (Componente 01), usado como µPC (Componente 13) | D (3 bits) recebe `PROX`; Q (3 bits) é o µPC; CLK; WE fixo em 1; R (reset) ligado a `RESET` |
+| Somador +1 | Somador de 3 bits | Entradas: µPC e constante 1; a saída (µPC + 1) é a entrada 0 do multiplexador de próximo endereço |
+| ROM 8×8 | ROM (Componente 05) | Endereço A de 3 bits = µPC; saída de 8 bits dividida em UO1UO0 (ULAOp), FT1FT0 (Fonte), AC1AC0 (Ação) e SQ1SQ0 (Seq) |
+| MUX de próximo endereço | Multiplexador de 4 entradas (Componente 02) | Seleção = SQ1SQ0. 00 → µPC + 1; 01 → 0; 10 → saída do MUX de despacho; 11 → 0. Saída = `PROX` |
+| MUX de despacho | Multiplexador de 2 entradas | Seleção = `OP_BEQ`. 0 → constante 2 (ExecR); 1 → constante 4 (ConclBEQ) |
+| Display | Decodificador de 7 segmentos (Componente 16) | Mostra o µPC; o 4º bit vai a uma constante 0 (rótulo `GND`), independente do `ZERO` |
+| CLK | Pino de entrada, 1 bit | Relógio do µPC |
+| RESET | Pino de entrada, 1 bit | Zera o µPC (estado S0) |
+| OP_BEQ | Pino de entrada, 1 bit | 0 = tipo-R; 1 = beq (decide o despacho em S1) |
+| ZERO | Pino de entrada, 1 bit | Simula o sinal Zero da ULA, pois o caminho de dados não está montado |
+| Saídas de controle | Pinos de saída | PCWrite, PCWriteCond, PCSource, MemRead, IRWrite, RegWrite, ALUSrcA, ALUSrcB1, ALUSrcB0, ALUOp1, ALUOp0 e uPC_2..uPC_0 |
+
+#### Decodificação dos campos em sinais de controle
+
+Os campos lidos da ROM são convertidos nos nove sinais de controle por portas AND e NOT (Figura 21). As equações estão na Tabela 19. Os campos ULAOp e ALUSrcB1 passam direto: ULAOp vai para ALUOp1 e ALUOp0, e FT1 é o próprio ALUSrcB1.
+
+**Figura 21 — Portas de decodificação dos campos da microinstrução.**
+
+![Decodificação dos campos](../parte2/evidencias/evidencias-microprogamada/evidencias/circuito_decodificacao_portas.png)
+
+**Tabela 19 — Decodificação dos campos (FT = Fonte, AC = Ação, UO = ULAOp).**
+
+| Sinal | Equação | Campo |
+|---|---|---|
+| PCWrite e ALUSrcB0 | FT1' · FT0' | Fonte = 00 |
+| ALUSrcA | FT1' · FT0 | Fonte = 01 |
+| ALUSrcB1 | FT1 | Fonte = 10 |
+| MemRead e IRWrite | AC1' · AC0 | Ação = 01 |
+| RegWrite | AC1 · AC0' | Ação = 10 |
+| PCWriteCond e PCSource | AC1 · AC0 | Ação = 11 |
+| ALUOp1, ALUOp0 | UO1, UO0 (direto) | ULAOp |
+
+<!-- CONFIRMAR: o esquema de portas da Figura 21 também calcula D2 D1 D0 (próximo µPC). Indicar se ele alimenta o registrador ou se PROX vem do somador com multiplexador (Figura 20). Na Figura 20, o registrador recebe PROX. -->
+
 ### 3.4 Comparação entre as duas versões
 
 ### 3.5 Testes (T-06 a T-09)
+
+#### Versão microprogramada
+
+Os testes T-06 a T-08 foram executados na versão microprogramada, com a simulação habilitada, o pulso automático desligado e um ciclo completo de relógio por estado. Os pinos `RESET`, `OP_BEQ` e `ZERO` foram acionados com a ferramenta de interação, e o display de sete segmentos mostra o estado atual. As Tabelas 20 a 22 registram as entradas, as saídas esperadas e as observadas, e as capturas estão nas Figuras 22 a 32.
+
+**Tabela 20 — T-06, ciclo de busca (`parte2_microprogramada.circ`).**
+
+| Momento | Entradas | Esperado | Observado | Figura |
+|---|---|---|---|---|
+| Após o reset | RESET = 1, OP_BEQ = 0 | estado S0; PCWrite, MemRead, IRWrite e ALUSrcB0 em 1 | display 0; os quatro sinais em 1 | 22 |
+| Um ciclo depois | RESET = 0 | estado S1; IRWrite volta a 0; ALUSrcB1 em 1 | display 1; IRWrite = 0; ALUSrcB1 = 1 | 23 |
+
+**Figura 22 — T-06, estado S0: sequenciador (RESET = 1) e saídas.**
+
+![T-06 S0, sequenciador](../parte2/evidencias/evidencias-microprogamada/evidencias/T06_S0_sequenciador.png)
+
+![T-06 S0, saídas](../parte2/evidencias/evidencias-microprogamada/evidencias/T06_S0_saidas.png)
+
+**Figura 23 — T-06, estado S1: sequenciador e saídas.**
+
+![T-06 S1, sequenciador](../parte2/evidencias/evidencias-microprogamada/evidencias/T06_S1_sequenciador.png)
+
+![T-06 S1, saídas](../parte2/evidencias/evidencias-microprogamada/evidencias/T06_S1_saidas.png)
+
+**Tabela 21 — T-07, instrução tipo-R (`OP_BEQ` = 0, quatro ciclos).**
+
+| Estado | Display | Esperado (sinais em 1) | Observado | Figura |
+|---|---|---|---|---|
+| S0 | 0 | PCWrite, MemRead, IRWrite, ALUSrcB0 | igual ao esperado | 24 |
+| S1 | 1 | ALUSrcB1 | igual ao esperado | 25 |
+| S2 | 2 | ALUSrcA, ALUOp1 | igual ao esperado | 26 |
+| S3 | 3 | RegWrite, ALUSrcA | igual ao esperado | 27 |
+| volta | 0 | PCWrite, MemRead, IRWrite, ALUSrcB0 | igual ao esperado | 28 |
+
+Como o caminho de dados não foi montado, o registro do resultado em `rd` é demonstrado pelo sinal RegWrite = 1 em S3.
+
+**Figura 24 — T-07, estado S0.**
+
+![T-07 S0](../parte2/evidencias/evidencias-microprogamada/evidencias/T07_S0.png)
+
+**Figura 25 — T-07, estado S1.**
+
+![T-07 S1](../parte2/evidencias/evidencias-microprogamada/evidencias/T07_S1.png)
+
+**Figura 26 — T-07, estado S2.**
+
+![T-07 S2](../parte2/evidencias/evidencias-microprogamada/evidencias/T07_S2.png)
+
+**Figura 27 — T-07, estado S3 (RegWrite = 1).**
+
+![T-07 S3](../parte2/evidencias/evidencias-microprogamada/evidencias/T07_S3.png)
+
+**Figura 28 — T-07, retorno ao estado S0.**
+
+![T-07 volta](../parte2/evidencias/evidencias-microprogamada/evidencias/T07_volta.png)
+
+**Tabela 22 — T-08, desvio tomado e não tomado (`OP_BEQ` = 1).**
+
+| Caso | ZERO | Estado | Sinais em 1 (observados) | Efeito no PC | Figura |
+|---|---|---|---|---|---|
+| Tomado | 1 | S4 (display 4) | PCWriteCond, PCSource, ALUSrcA, ALUOp0 | PC ← ULAOut | 31 |
+| Não tomado | 0 | S4 (display 4) | PCWriteCond, PCSource, ALUSrcA, ALUOp0 | PC não muda | 32 |
+
+Os sinais de saída são os mesmos nos dois casos, porque dependem apenas do estado. A diferença está no pino `ZERO`: o PC só é gravado quando PCWriteCond · ZERO = 1. Como o caminho de dados não foi montado, o `ZERO` foi simulado por um pino de entrada. O caminho S0 → S1 → S4 → S0 está nas Figuras 29 e 30.
+
+**Figura 29 — T-08, estado S4 (caminho S0 → S1 → S4).**
+
+![T-08 S4](../parte2/evidencias/evidencias-microprogamada/evidencias/T08_S4.png)
+
+**Figura 30 — T-08, retorno ao estado S0.**
+
+![T-08 volta](../parte2/evidencias/evidencias-microprogamada/evidencias/T08_volta.png)
+
+**Figura 31 — T-08, estado S4 com ZERO = 1 (desvio tomado).**
+
+![T-08 tomado](../parte2/evidencias/evidencias-microprogamada/evidencias/T08_tomado.png)
+
+**Figura 32 — T-08, estado S4 com ZERO = 0 (desvio não tomado).**
+
+![T-08 não tomado](../parte2/evidencias/evidencias-microprogamada/evidencias/T08_nao_tomado.png)
+
+#### T-09 — lado microprogramado
+
+A Tabela 23 registra os sinais da versão microprogramada em cada estado (`OP_BEQ` = 0 de S0 a S3 e `OP_BEQ` = 1 em S4), para serem confrontados com os da versão cabeada. As capturas são as das Figuras 24 a 27 e 29, também salvas como `T09_micro_S0.png` a `T09_micro_S4.png`.
+
+**Tabela 23 — Sinais de controle por estado na versão microprogramada.**
+
+| Estado | PCWrite | PCWriteCond | PCSource | MemRead | IRWrite | RegWrite | ALUSrcA | ALUSrcB1 | ALUSrcB0 | ALUOp1 | ALUOp0 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S0 | 1 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 0 | 0 |
+| S1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| S2 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 0 |
+| S3 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 | 0 |
+| S4 | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 |
 
 ## 4. Declaração de uso de IA generativa
 
