@@ -9,9 +9,9 @@
 
 | Integrante | Matrícula | Responsabilidades |
 |------------|-----------|-------------------|
-| Rian       |2025015769           |                   |
+| Rian       |2025015769 |                   |
 | Davi       |           |                   |
-| Cauê       |           |                   |
+| Cauê       |2025015670 |                   |
 
 ## 2. Ferramentas e como abrir os arquivos
 
