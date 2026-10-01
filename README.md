@@ -9,7 +9,7 @@
 
 | Integrante | Matrícula | Responsabilidades |
 |------------|-----------|-------------------|
-| Rian       |           |                   |
+| Rian       |2025015769           |                   |
 | Davi       |           |                   |
 | Cauê       |           |                   |
 
@@ -59,7 +59,10 @@
 
 ## 5. Declaração de uso de IA generativa
 
-_(ferramentas, etapas e finalidade)_
+Davi: Uso do Claude Code para orientação, revisão dos circuitos e criação do modelo base para planilha e relatório.
+Rian: Uso do Claude Code para orientação, revisão dos circuitos e desenho do diagrama de estados.
+Cauê: Foi utilizada a ferramenta de IA generativa Claude (Anthropic) como apoio na conferência do microcódigo e na orientação sobre o uso do Logisim-Evolution durante os testes; os circuitos, as simulações e as capturas de tela foram feitos pela equipe.
+
 
 ## 6. Divisão do trabalho
 
